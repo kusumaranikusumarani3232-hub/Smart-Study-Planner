@@ -2,8 +2,12 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import random
+import os
 
 st.title("📚 Smart Study Planner")
+
+# ---------- FILE NAME ----------
+FILE_NAME = "saved_plan.csv"
 
 # ---------- USER INPUT ----------
 st.sidebar.header("Enter Details")
@@ -22,6 +26,13 @@ topics_dict = {
     "CS": ["Data Structures", "Algorithms", "DBMS", "Operating Systems"]
 }
 
+# ---------- LOAD SAVED DATA ----------
+if "plan_df" not in st.session_state:
+    if os.path.exists(FILE_NAME):
+        st.session_state.plan_df = pd.read_csv(FILE_NAME)
+    else:
+        st.session_state.plan_df = None
+
 # ---------- GENERATE PLAN ----------
 if st.button("🚀 Generate Study Plan"):
 
@@ -33,13 +44,8 @@ if st.button("🚀 Generate Study Plan"):
 
         for subject in subjects_list:
 
-            # Topic selection
-            if subject in topics_dict:
-                topic = random.choice(topics_dict[subject])
-            else:
-                topic = "General Study"
+            topic = random.choice(topics_dict.get(subject, ["General Study"]))
 
-            # Hours logic
             if subject in weak_subjects:
                 hours = 3
                 suggestion = f"⚠ Focus more on {topic}"
@@ -47,7 +53,6 @@ if st.button("🚀 Generate Study Plan"):
                 hours = 2
                 suggestion = f"Revise {topic}"
 
-            # Study type
             if i % 3 == 0:
                 study_type = "Revision"
             elif i % 3 == 1:
@@ -61,23 +66,47 @@ if st.button("🚀 Generate Study Plan"):
                 hours,
                 topic,
                 study_type,
-                suggestion
+                suggestion,
+                False
             ])
 
-    df = pd.DataFrame(plan, columns=["Date", "Subject", "Hours", "Topic", "Type", "Suggestion"])
+    df = pd.DataFrame(plan, columns=["Date", "Subject", "Hours", "Topic", "Type", "Suggestion", "Completed"])
 
-    st.success("✅ Plan Generated")
+    st.session_state.plan_df = df
+    df.to_csv(FILE_NAME, index=False)  # ✅ Save immediately
 
-    # Show total hours
-    st.subheader("📊 Total Study Hours")
-    st.write(df["Hours"].sum())
+# ---------- DISPLAY ----------
+if st.session_state.plan_df is not None:
 
-    # Show table
-    st.dataframe(df)
+    df = st.session_state.plan_df
+
+    st.success("✅ Plan Loaded")
+
+    edited_df = st.data_editor(df, use_container_width=True)
+
+    # Save updates automatically
+    edited_df.to_csv(FILE_NAME, index=False)
+    st.session_state.plan_df = edited_df
+
+    # Progress
+    total = len(edited_df)
+    completed = edited_df["Completed"].sum()
+    progress = completed / total if total > 0 else 0
+
+    st.subheader("📊 Progress")
+    st.progress(progress)
+    st.write(f"✅ Completed: {completed} / {total}")
 
     # Chart
     st.subheader("📈 Study Hours per Subject")
-    st.bar_chart(df.groupby("Subject")["Hours"].sum())
+    st.bar_chart(edited_df.groupby("Subject")["Hours"].sum())
 
     # Download
-    st.download_button("📥 Download Plan", df.to_csv(index=False), "study_plan.csv")
+    st.download_button("📥 Download Plan", edited_df.to_csv(index=False), "study_plan.csv")
+
+# ---------- RESET BUTTON ----------
+if st.button("🗑 Reset Plan"):
+    if os.path.exists(FILE_NAME):
+        os.remove(FILE_NAME)
+    st.session_state.plan_df = None
+    st.success("Plan Reset! Refresh page.")
