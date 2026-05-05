@@ -81,4 +81,3 @@ if st.button("🚀 Generate Study Plan"):
 
     # Download
     st.download_button("📥 Download Plan", df.to_csv(index=False), "study_plan.csv")
-    
