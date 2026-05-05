@@ -3,99 +3,82 @@ import pandas as pd
 from datetime import datetime, timedelta
 import random
 
-st.set_page_config(page_title="Smart Study Planner", layout="wide")
-
-# ---------- TITLE ----------
 st.title("📚 Smart Study Planner")
-st.markdown("### Plan smarter, not harder 💡")
 
-# ---------- LAYOUT ----------
-col1, col2 = st.columns([1,2])
+# ---------- USER INPUT ----------
+st.sidebar.header("Enter Details")
 
-with col1:
-    st.header("Enter Details")
+subjects_input = st.sidebar.text_input("Subjects (comma separated)", "Math,Physics,CS")
+exam_days = st.sidebar.number_input("Days until exam", min_value=1, value=10)
+weak_subjects_input = st.sidebar.text_input("Weak Subjects", "Math")
 
-    subjects_input = st.text_input("Subjects (comma separated)", "Math,Physics,CS")
-    days = st.number_input("Days until exam", min_value=1, value=10)
-    weak_input = st.text_input("Weak Subjects", "Math")
+subjects_list = [s.strip() for s in subjects_input.split(",")]
+weak_subjects = [s.strip() for s in weak_subjects_input.split(",")]
 
-    subjects = [s.strip() for s in subjects_input.split(",") if s.strip()]
-    weak_subjects = [s.strip() for s in weak_input.split(",") if s.strip()]
-
-    st.subheader("Difficulty (1–3)")
-    difficulty = {}
-    for sub in subjects:
-        difficulty[sub] = st.slider(sub, 1, 3, 2)
-
-# ---------- TOPICS ----------
-topics = {
-    "Math": ["Algebra", "Calculus", "Trigonometry"],
-    "Physics": ["Mechanics", "Optics"],
-    "CS": ["Python", "Data Structures"]
+# ---------- TOPIC DATABASE ----------
+topics_dict = {
+    "Math": ["Algebra", "Calculus", "Trigonometry", "Probability"],
+    "Physics": ["Mechanics", "Optics", "Thermodynamics", "Modern Physics"],
+    "CS": ["Data Structures", "Algorithms", "DBMS", "Operating Systems"]
 }
 
-def get_suggestion(subject, topic, hours, is_weak):
-    if is_weak:
-        return f"⚠️ Focus more on {topic}. Strengthen basics + practice more."
+# ---------- GENERATE PLAN ----------
+if st.button("🚀 Generate Study Plan"):
 
-    if subject == "Math":
-        return f"Practice {topic} problems + revise formulas."
-    elif subject == "Physics":
-        return f"Understand {topic} + solve numericals."
-    elif subject == "CS":
-        return f"Code {topic} problems."
-    
-    return f"Study {topic}"
+    start_date = datetime.today()
+    plan = []
 
-# ---------- GENERATE ----------
-with col2:
-    if st.button("🚀 Generate Study Plan"):
+    for i in range(exam_days):
+        study_day = start_date + timedelta(days=i)
 
-        plan = []
-        start = datetime.today()
+        for subject in subjects_list:
 
-        for i in range(days):
-            date = start + timedelta(days=i)
+            # Topic selection
+            if subject in topics_dict:
+                topic = random.choice(topics_dict[subject])
+            else:
+                topic = "General Study"
 
-            for subject in subjects:
-                base = difficulty[subject]
-                hours = base * 3 if subject in weak_subjects else base * 2
+            # Hours logic
+            if subject in weak_subjects:
+                hours = 3
+                suggestion = f"⚠ Focus more on {topic}"
+            else:
+                hours = 2
+                suggestion = f"Revise {topic}"
 
-                study_type = ["Revision", "Practice", "Concept"][i % 3]
-                topic = random.choice(topics.get(subject, ["General"]))
+            # Study type
+            if i % 3 == 0:
+                study_type = "Revision"
+            elif i % 3 == 1:
+                study_type = "Practice"
+            else:
+                study_type = "Test"
 
-                suggestion = get_suggestion(subject, topic, hours, subject in weak_subjects)
+            plan.append([
+                study_day.strftime("%Y-%m-%d"),
+                subject,
+                hours,
+                topic,
+                study_type,
+                suggestion
+            ])
 
-                plan.append({
-                    "Date": date.strftime("%Y-%m-%d"),
-                    "Subject": subject,
-                    "Hours": hours,
-                    "Topic": topic,
-                    "Type": study_type,
-                    "Suggestion": suggestion
-                })
+    df = pd.DataFrame(plan, columns=["Date", "Subject", "Hours", "Topic", "Type", "Suggestion"])
 
-        df = pd.DataFrame(plan)
+    st.success("✅ Plan Generated")
 
-        # ---------- SUMMARY ----------
-        st.success("✅ Plan Generated")
+    # Show total hours
+    st.subheader("📊 Total Study Hours")
+    st.write(df["Hours"].sum())
 
-        total_hours = df["Hours"].sum()
-        st.metric("📊 Total Study Hours", total_hours)
+    # Show table
+    st.dataframe(df)
 
-        # ---------- TABLE ----------
-        st.dataframe(df, use_container_width=True)
+    # Chart
+    st.subheader("📈 Study Hours per Subject")
+    st.bar_chart(df.groupby("Subject")["Hours"].sum())
 
-        # ---------- CHART ----------
-        st.subheader("📊 Hours per Subject")
-        chart = df.groupby("Subject")["Hours"].sum()
-        st.bar_chart(chart)
-
-        # ---------- DOWNLOAD ----------
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇ Download CSV", csv, "study_plan.csv", "text/csv")
-
-
-           
-            
+    # Download
+    st.download_button("📥 Download Plan", df.to_csv(index=False), "study_plan.csv")
     
